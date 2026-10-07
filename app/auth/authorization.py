@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
 
-from app.auth.authentication import CurrentUser  # noqa: TC001
+from app.auth.authentication import CurrentUser
 
 if TYPE_CHECKING:
     from app.permissions.enums import PermissionName

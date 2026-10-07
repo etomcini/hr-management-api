@@ -8,7 +8,7 @@ from app.core.validators import validate_password_strength
 class Token(BaseModel):
     access_token: str
     refresh_token: str
-    token_type: Literal["bearer"] = "bearer"  # noqa: S105
+    token_type: Literal["bearer"] = "bearer"
 
 
 class RefreshTokenRequest(BaseModel):
@@ -17,7 +17,7 @@ class RefreshTokenRequest(BaseModel):
 
 class AccessTokenResponse(BaseModel):
     access_token: str
-    token_type: Literal["bearer"] = "bearer"  # noqa: S105
+    token_type: Literal["bearer"] = "bearer"
 
 
 class ForgotPasswordRequest(BaseModel):
