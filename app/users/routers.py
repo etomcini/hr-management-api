@@ -3,10 +3,9 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.authentication import CurrentSessionJTI, CurrentUser  # noqa: TC001
+from app.auth.authentication import CurrentSessionJTI, CurrentUser
 from app.auth.authorization import require_permissions
 from app.permissions.enums import PermissionName
-from app.roles.enums import RoleName
 from app.users.models import User
 
 if TYPE_CHECKING:

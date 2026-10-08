@@ -16,3 +16,16 @@ dependencies = [
     "pyjwt>=2.14.0",
     "sqlalchemy>=2.0.52",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+extend-exclude = [
+    "alembic/versions",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/env.py" = ["INP001"]

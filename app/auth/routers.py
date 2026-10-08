@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from app.users.models import User
 
 from app.auth.authentication import (
-    CurrentUser,  # noqa: TC001
+    CurrentUser,
 )
 from app.auth.schemas import (
     AccessTokenResponse,
