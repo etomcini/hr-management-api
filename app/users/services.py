@@ -12,6 +12,7 @@ from app.core.security import hash_password, verify_password
 from app.roles.models import Role
 from app.roles.services import get_role_by_name
 from app.users.models import User, UserRole
+from app.users.role_policy import validate_role_changes
 
 if TYPE_CHECKING:
     from app.users.schemas import ChangePasswordRequest, UserCreate, UserUpdate
@@ -275,10 +276,21 @@ async def assign_db_role_to_user(
     db: AsyncSession,
     user_id: int,
     role_id: int,
+    actor: User,
 ) -> UserRole:
     await get_db_user_by_id(
         db=db,
         user_id=user_id,
+    )
+
+    role = await get_db_role_by_id(
+        db=db,
+        role_id=role_id,
+    )
+
+    validate_role_changes(
+        actor=actor,
+        roles=[role],
     )
 
     await get_db_role_by_id(
@@ -298,6 +310,7 @@ async def assign_db_role_to_user(
     )
 
     db.add(user_role)
+
     await db.commit()
     await db.refresh(user_role)
 
@@ -308,6 +321,7 @@ async def update_db_user_roles(
     db: AsyncSession,
     user_id: int,
     role_ids: list[int],
+    actor: User,
 ) -> list[Role]:
     await get_db_user_by_id(
         db=db,
@@ -334,13 +348,26 @@ async def update_db_user_roles(
         select(UserRole).where(UserRole.user_id == user_id)
     )
 
-    current_user_roles = list(await user_roles_result.all())
+    current_user_roles = list(user_roles_result.all())
 
     current_role_ids = {user_role.role_id for user_role in current_user_roles}
 
     # Calculate the difference.
     role_ids_to_add = requested_role_ids - current_role_ids
     role_ids_to_remove = current_role_ids - requested_role_ids
+
+    # Validate every role that will change.
+    changed_role_ids = role_ids_to_add | role_ids_to_remove
+
+    if changed_role_ids:
+        changed_roles_result = await db.scalars(
+            select(Role).where(Role.id.in_(changed_role_ids))
+        )
+
+        validate_role_changes(
+            actor=actor,
+            roles=list(changed_roles_result.all()),
+        )
 
     # Remove roles.
     for user_role in current_user_roles:
@@ -365,10 +392,21 @@ async def remove_db_role_from_user(
     db: AsyncSession,
     user_id: int,
     role_id: int,
+    actor: User,
 ) -> None:
     await get_db_user_by_id(
         db=db,
         user_id=user_id,
+    )
+
+    role = await get_db_role_by_id(
+        db=db,
+        role_id=role_id,
+    )
+
+    validate_role_changes(
+        actor=actor,
+        roles=[role],
     )
 
     stmt = select(UserRole).where(

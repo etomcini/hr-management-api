@@ -3,8 +3,9 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# from sqlalchemy.orm import selectinload
+from app.auth.authorization import require_permissions
 from app.dependencies.database import get_db
+from app.permissions.enums import PermissionName
 
 if TYPE_CHECKING:
     from app.departments import models
@@ -36,6 +37,13 @@ router = APIRouter(
     "/",
     response_model=list[DepartmentResponse],
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.DEPARTMENTS_READ,
+            )
+        ),
+    ],
     summary="Get all departments or filter by name",
 )
 async def get_departments(
@@ -49,6 +57,13 @@ async def get_departments(
     "/{department_id}",
     response_model=DepartmentResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.DEPARTMENTS_READ,
+            )
+        ),
+    ],
     summary="Get a department by ID",
 )
 async def get_department(
@@ -61,6 +76,13 @@ async def get_department(
     "/",
     response_model=DepartmentResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.DEPARTMENTS_CREATE,
+            )
+        ),
+    ],
 )
 async def create_department(
     department_data: DepartmentCreate, db: Annotated[AsyncSession, Depends(get_db)]
@@ -72,6 +94,13 @@ async def create_department(
     "/{department_id}",
     response_model=DepartmentResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.DEPARTMENTS_UPDATE,
+            )
+        ),
+    ],
     summary="Update department partialy through PATCH",
 )
 async def update_department(
@@ -85,6 +114,13 @@ async def update_department(
 @router.delete(
     "/{department_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.DEPARTMENTS_DELETE,
+            )
+        ),
+    ],
 )
 async def delete_department(
     department_id: int, db: Annotated[AsyncSession, Depends(get_db)]

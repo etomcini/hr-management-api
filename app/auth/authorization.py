@@ -1,28 +1,3 @@
-# from collections.abc import Callable
-# from typing import TYPE_CHECKING
-
-# from fastapi import HTTPException, status
-
-# from app.auth.authentication import CurrentUser
-
-# if TYPE_CHECKING:
-#     from app.users.models import User
-
-
-# def require_roles(*allowed_roles: str) -> Callable:
-#     def check_roles(current_user: CurrentUser) -> User:
-#         user_roles = {user_role.role.name for user_role in current_user.user_roles}
-
-#         if not user_roles.intersection(allowed_roles):
-#             raise HTTPException(
-#                 status_code=status.HTTP_403_FORBIDDEN,
-#                 detail="You do not have permission to perform this action.",
-#             )
-
-#         return current_user
-
-#     return check_roles
-
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
