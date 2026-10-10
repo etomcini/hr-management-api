@@ -3,7 +3,9 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.authorization import require_permissions
 from app.dependencies.database import get_db
+from app.permissions.enums import PermissionName
 
 if TYPE_CHECKING:
     from app.roles import models
@@ -34,6 +36,13 @@ router = APIRouter(
     "/",
     response_model=list[RoleResponse],
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.ROLES_READ,
+            )
+        ),
+    ],
     summary="Get all roles or filter by name",
 )
 async def get_roles(
@@ -50,6 +59,13 @@ async def get_roles(
     "/{role_id}",
     response_model=RoleResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.ROLES_READ,
+            )
+        ),
+    ],
     summary="Get a role by ID",
 )
 async def get_role(
@@ -62,6 +78,13 @@ async def get_role(
     "/",
     response_model=RoleResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.ROLES_CREATE,
+            )
+        ),
+    ],
 )
 async def create_role(
     role_data: RoleCreate, db: Annotated[AsyncSession, Depends(get_db)]
@@ -73,6 +96,13 @@ async def create_role(
     "/{role_id}",
     response_model=RoleResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.ROLES_UPDATE,
+            )
+        ),
+    ],
     summary="Update role partialy through PATCH",
 )
 async def update_role(
@@ -84,6 +114,13 @@ async def update_role(
 @router.delete(
     "/{role_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.ROLES_DELETE,
+            )
+        ),
+    ],
 )
 async def delete_role(
     role_id: int, db: Annotated[AsyncSession, Depends(get_db)]
