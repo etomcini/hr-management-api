@@ -37,6 +37,46 @@ services:
       db:
         condition: service_healthy
 
+  rbac-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    env_file:
+      - .env
+
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+
+    command: ["python", "-m", "app.seeds.sync"]
+
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+    restart: "no"
+
+  admin-bootstrap:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    env_file:
+      - .env
+
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+
+    command: ["python", "-m", "app.users.bootstrap_admin"]
+
+    depends_on:
+      rbac-sync:
+        condition: service_completed_successfully
+
+    restart: "no"
+
   app:
     build:
       context: .
@@ -49,7 +89,7 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 
     depends_on:
-      migrate:
+      admin-bootstrap:
         condition: service_completed_successfully
 
     healthcheck:

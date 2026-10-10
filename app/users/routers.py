@@ -97,6 +97,25 @@ async def create_user(
     return await create_db_user(db, user_data)
 
 
+@router.patch(
+    "/me/password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Change current user's password",
+)
+async def change_password(
+    password_data: ChangePasswordRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: CurrentUser,
+    current_jti: CurrentSessionJTI,
+) -> None:
+    await change_user_password(
+        db=db,
+        user=current_user,
+        current_jti=current_jti,
+        password_data=password_data,
+    )
+
+
 @router.get(
     "/{user_id}",
     response_model=UserResponse,
@@ -195,6 +214,7 @@ async def get_role_users(
 
 @router.post(
     "/{user_id}/roles/{role_id}",
+    response_model=UserRoleResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[
         Depends(
@@ -242,25 +262,6 @@ async def update_user_roles(
         user_id=user_id,
         role_ids=role_data.role_ids,
         actor=current_user,
-    )
-
-
-@router.patch(
-    "/me/password",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Change current user's password",
-)
-async def change_password(
-    password_data: ChangePasswordRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: CurrentUser,
-    current_jti: CurrentSessionJTI,
-) -> None:
-    await change_user_password(
-        db=db,
-        user=current_user,
-        current_jti=current_jti,
-        password_data=password_data,
     )
 
 

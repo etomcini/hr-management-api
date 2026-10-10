@@ -6,10 +6,28 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.roles.enums import RoleName
 from app.roles.models import Role
 
 if TYPE_CHECKING:
     from app.roles.schemas import RoleCreate, RoleUpdate
+
+
+"""
+Helper to prevent Admin and HR manager to rename or delete one of five built-in roles.
+Since those role names are used by authorization logic and RBAC synchronization, 
+this could break the application.
+"""
+
+SYSTEM_ROLE_NAMES = {role.value for role in RoleName}
+
+
+def ensure_role_can_be_renamed_or_deleted(role: Role) -> None:
+    if role.name in SYSTEM_ROLE_NAMES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=("Built-in roles cannot be renamed or deleted."),
+        )
 
 
 async def get_role_by_name(
@@ -85,14 +103,28 @@ async def update_db_role(
 
     update_data = role_data.model_dump(exclude_unset=True)
 
-    if "name" in update_data and update_data["name"] is not None:
-        existing_role = await get_role_by_name(db=db, name=update_data["name"])
+    if "name" in update_data:
+        new_name = update_data["name"]
 
-        if existing_role is not None and existing_role.id != role.id:
+        if new_name is None:
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Role already exists",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Role name cannot be null.",
             )
+
+        if new_name != role.name:
+            ensure_role_can_be_renamed_or_deleted(role)
+
+            existing_role = await get_role_by_name(
+                db=db,
+                name=new_name,
+            )
+
+            if existing_role is not None and existing_role.id != role.id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Role already exists",
+                )
 
     for field, value in update_data.items():
         setattr(role, field, value)
@@ -108,6 +140,8 @@ async def delete_db_role(
     role_id: int,
 ) -> None:
     role = await get_db_role_by_id(db=db, role_id=role_id)
+
+    ensure_role_can_be_renamed_or_deleted(role)
 
     await db.delete(role)
     await db.commit()

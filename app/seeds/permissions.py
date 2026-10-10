@@ -112,67 +112,71 @@ ROLE_PERMISSIONS = {
 
 
 async def seed_permissions(db: AsyncSession) -> None:
-    result = await db.execute(select(Permission))
+    result = await db.scalars(select(Permission))
 
-    existing_permissions = {permission.name for permission in result.scalars().all()}
+    existing = {permission.name: permission for permission in result.all()}
 
     for permission_name, description in PERMISSIONS.items():
-        if permission_name.value not in existing_permissions:
+        name = permission_name.value
+
+        permission = existing.get(name)
+
+        if permission is None:
             db.add(
                 Permission(
-                    name=permission_name.value,
+                    name=name,
                     description=description,
                 )
             )
+        elif permission.description != description:
+            permission.description = description
 
-    await db.commit()
+    await db.flush()
 
 
 async def seed_role_permissions(db: AsyncSession) -> None:
-    roles_result = await db.execute(select(Role))
-    roles = {role.name: role for role in roles_result.scalars().all()}
+    roles_result = await db.scalars(select(Role))
+    roles = {role.name: role for role in roles_result.all()}
 
-    permissions_result = await db.execute(select(Permission))
+    permissions_result = await db.scalars(select(Permission))
     permissions = {
-        permission.name: permission for permission in permissions_result.scalars().all()
+        permission.name: permission for permission in permissions_result.all()
     }
 
-    existing_result = await db.execute(select(RolePermission))
+    existing_result = await db.scalars(select(RolePermission))
 
     existing_assignments = {
-        (
-            role_permission.role_id,
-            role_permission.permission_id,
-        )
-        for role_permission in existing_result.scalars().all()
+        (rp.role_id, rp.permission_id): rp for rp in existing_result.all()
     }
 
     for role_name, permission_names in ROLE_PERMISSIONS.items():
         role = roles.get(role_name.value)
 
         if role is None:
-            continue
+            raise RuntimeError(f"Required role '{role_name.value}' is missing")
 
-        for permission_name in permission_names:
-            permission = permissions.get(permission_name.value)
+        desired_permission_ids = {
+            permissions[name.value].id for name in permission_names
+        }
 
-            if permission is None:
-                continue
+        # Add missing associations.
+        for permission_id in desired_permission_ids:
+            key = (role.id, permission_id)
 
-            assignment = (
-                role.id,
-                permission.id,
-            )
-
-            if assignment not in existing_assignments:
+            if key not in existing_assignments:
                 db.add(
                     RolePermission(
                         role_id=role.id,
-                        permission_id=permission.id,
+                        permission_id=permission_id,
                     )
                 )
 
-    await db.commit()
+        # Remove associations no longer configured.
+        for (role_id, permission_id), assignment in existing_assignments.items():
+            if role_id == role.id and permission_id not in desired_permission_ids:
+                await db.delete(assignment)
+
+    await db.flush()
 
 
 async def seed_rbac(db: AsyncSession) -> None:

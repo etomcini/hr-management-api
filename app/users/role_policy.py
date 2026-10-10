@@ -6,19 +6,22 @@ from app.roles.enums import RoleName
 from app.roles.models import Role
 from app.users.models import User
 
-PROTECTED_ROLES = {
-    RoleName.ADMIN,
-    RoleName.HR_MANAGER,
+HR_OPERATOR_ALLOWED_ROLES = {
+    RoleName.EMPLOYEE.value,
+    RoleName.MANAGER.value,
+    RoleName.HR_OPERATOR.value,
 }
 
 
 def validate_role_changes(
     actor: User,
     roles: Iterable[Role],
+    *,
+    target_user_id: int,
 ) -> None:
     actor_roles = {user_role.role.name for user_role in actor.user_roles}
 
-    # Admin and HR Manager can manage all role assignments.
+    # Admin and HR Manager can manage assignments.
     if actor_roles.intersection(
         {
             RoleName.ADMIN.value,
@@ -27,19 +30,26 @@ def validate_role_changes(
     ):
         return
 
-    # HR Operator may only manage unprotected roles.
     if RoleName.HR_OPERATOR.value not in actor_roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You cannot manage user roles.",
         )
 
+    # Prevent HR Operators from changing their own roles.
+    if actor.id == target_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="HR Operators cannot modify their own roles.",
+        )
+
+    # HR Operators may manage only explicitly approved roles.
     for role in roles:
-        if role.name in {protected_role.value for protected_role in PROTECTED_ROLES}:
+        if role.name not in HR_OPERATOR_ALLOWED_ROLES:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
-                    "HR Operators cannot assign, update, "
-                    "or remove Admin or HR Manager roles."
+                    "HR Operators may manage only employee, "
+                    "manager, and hr_operator roles."
                 ),
             )
