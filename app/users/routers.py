@@ -57,6 +57,13 @@ Routers for users CRUD operations
     "/",
     response_model=list[UserResponse],
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.USERS_READ,
+            )
+        ),
+    ],
 )
 async def get_users(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -90,95 +97,6 @@ async def create_user(
     return await create_db_user(db, user_data)
 
 
-@router.get(
-    "/{user_id}",
-    response_model=UserResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Get a user by ID",
-)
-async def get_user(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> User:
-    return await get_db_user_by_id(db, user_id)
-
-
-@router.patch(
-    "/{user_id}",
-    response_model=UserResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Partially update a user",
-)
-async def update_user(
-    user_id: int, user_data: UserUpdate, db: Annotated[AsyncSession, Depends(get_db)]
-) -> User:
-    return await update_db_user(db, user_id, user_data)
-
-
-@router.delete(
-    "/{user_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def delete_user(
-    user_id: int, db: Annotated[AsyncSession, Depends(get_db)]
-) -> None:
-    return await delete_db_user(db, user_id)
-
-
-"""
-Endpoints for user-role CRUD operations!
-"""
-
-
-@router.get(
-    "/{user_id}/roles",
-    response_model=list[RoleResponse],
-    status_code=status.HTTP_200_OK,
-    summary="Get roles asigned to a user.",
-)
-async def get_user_roles(
-    db: Annotated[AsyncSession, Depends(get_db)], user_id: int
-) -> list[Role]:
-    return await get_db_user_roles(db, user_id)
-
-
-@router.get(
-    "/{role_id}/users",
-    response_model=list[UserResponse],
-    status_code=status.HTTP_200_OK,
-    summary="Get users that heve asigned a specific role.",
-)
-async def get_role_users(
-    db: Annotated[AsyncSession, Depends(get_db)], role_id: int
-) -> list[User]:
-    return await get_db_role_users(db, role_id)
-
-
-@router.post(
-    "/{user_id}/roles/{role_id}",
-    status_code=status.HTTP_201_CREATED,
-)
-async def assign_role_to_user(
-    user_id: int, role_id: int, db: Annotated[AsyncSession, Depends(get_db)]
-) -> UserRoleResponse:
-    return await assign_db_role_to_user(db, user_id=user_id, role_id=role_id)
-
-
-@router.put(
-    "/{user_id}/roles/",
-    response_model=list[RoleResponse],
-    status_code=status.HTTP_200_OK,
-    summary="Update user's roles",
-)
-async def update_user_roles(
-    user_id: int,
-    role_data: UserRolesUpdate,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> list[Role]:
-    return await update_db_user_roles(
-        db,
-        user_id=user_id,
-        role_ids=role_data.role_ids,
-    )
-
-
 @router.patch(
     "/me/password",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -198,16 +116,173 @@ async def change_password(
     )
 
 
-@router.delete(
-    "/{user_id}/roles/{role_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Remove user's roles",
+@router.get(
+    "/{user_id}",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.USERS_READ,
+            )
+        ),
+    ],
+    summary="Get a user by ID",
 )
-async def remove_user_roles(
-    user_id: int, role_id: int, db: Annotated[AsyncSession, Depends(get_db)]
+async def get_user(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> User:
+    return await get_db_user_by_id(db, user_id)
+
+
+@router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.USERS_UPDATE,
+            )
+        ),
+    ],
+    summary="Partially update a user",
+)
+async def update_user(
+    user_id: int, user_data: UserUpdate, db: Annotated[AsyncSession, Depends(get_db)]
+) -> User:
+    return await update_db_user(db, user_id, user_data)
+
+
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.USERS_DELETE,
+            )
+        ),
+    ],
+)
+async def delete_user(
+    user_id: int, db: Annotated[AsyncSession, Depends(get_db)]
 ) -> None:
-    return await remove_db_role_from_user(
+    return await delete_db_user(db, user_id)
+
+
+"""
+Endpoints for user-role CRUD operations!
+"""
+
+
+@router.get(
+    "/{user_id}/roles",
+    response_model=list[RoleResponse],
+    status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.USER_ROLES_READ,
+            )
+        ),
+    ],
+    summary="Get roles asigned to a user.",
+)
+async def get_user_roles(
+    db: Annotated[AsyncSession, Depends(get_db)], user_id: int
+) -> list[Role]:
+    return await get_db_user_roles(db, user_id)
+
+
+@router.get(
+    "/{role_id}/users",
+    response_model=list[UserResponse],
+    status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.USER_ROLES_READ,
+            )
+        ),
+    ],
+    summary="Get users that heve asigned a specific role.",
+)
+async def get_role_users(
+    db: Annotated[AsyncSession, Depends(get_db)], role_id: int
+) -> list[User]:
+    return await get_db_role_users(db, role_id)
+
+
+@router.post(
+    "/{user_id}/roles/{role_id}",
+    response_model=UserRoleResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.USER_ROLES_ASSIGN,
+            )
+        ),
+    ],
+)
+async def assign_role_to_user(
+    user_id: int,
+    role_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: CurrentUser,
+) -> UserRoleResponse:
+    return await assign_db_role_to_user(
         db,
         user_id=user_id,
         role_id=role_id,
+        actor=current_user,
+    )
+
+
+@router.put(
+    "/{user_id}/roles/",
+    response_model=list[RoleResponse],
+    status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.USER_ROLES_UPDATE,
+            )
+        ),
+    ],
+    summary="Update user's roles",
+)
+async def update_user_roles(
+    user_id: int,
+    role_data: UserRolesUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: CurrentUser,
+) -> list[Role]:
+    return await update_db_user_roles(
+        db,
+        user_id=user_id,
+        role_ids=role_data.role_ids,
+        actor=current_user,
+    )
+
+
+@router.delete(
+    "/{user_id}/roles/{role_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.USER_ROLES_DELETE,
+            )
+        ),
+    ],
+    summary="Remove user's roles",
+)
+async def remove_user_roles(
+    user_id: int,
+    role_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: CurrentUser,
+) -> None:
+    return await remove_db_role_from_user(
+        db, user_id=user_id, role_id=role_id, actor=current_user
     )

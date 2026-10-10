@@ -42,7 +42,10 @@ class UserRoleResponse(BaseModel):
 
 
 class UserRolesUpdate(BaseModel):
-    role_ids: list[int] = Field(default_factory=list)
+    role_ids: list[int] = Field(
+        default_factory=list,
+        min_length=1,
+    )
 
 
 class ChangePasswordRequest(BaseModel):

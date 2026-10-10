@@ -7,21 +7,16 @@ from app import models  # noqa: F401
 from app.auth import routers as auth_routers
 from app.core.config import settings
 from app.departments import routers as department_routers
-from app.dependencies.database import AsyncSessionLocal, engine
+from app.dependencies.database import engine
 from app.employees import routers as employees_routers
 from app.health.router import router as health_router
 from app.job_titles import routers as job_title_routers
 from app.roles import routers as role_routers
-from app.seeds.permissions import seed_rbac
 from app.users import routers as user_routers
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
-    # Seed RBAC data
-    async with AsyncSessionLocal() as db:
-        await seed_rbac(db)
-
     yield
 
     # Shutdown
