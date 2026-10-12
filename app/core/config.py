@@ -11,6 +11,8 @@ class Environment(StrEnum):
 
 
 class Settings(BaseSettings):
+    app_env: Environment = Environment.DEVELOPMENT
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -18,7 +20,6 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_env: Environment = Environment.DEVELOPMENT
     docs_enabled: bool = True
 
     # Database

@@ -6,6 +6,8 @@ from app.permissions.models import Permission
 from app.roles.enums import RoleName
 from app.roles.models import Role, RolePermission
 
+from .roles import seed_roles
+
 PERMISSIONS = {
     PermissionName.USERS_READ: "Read users",
     PermissionName.USERS_CREATE: "Create users",
@@ -180,5 +182,6 @@ async def seed_role_permissions(db: AsyncSession) -> None:
 
 
 async def seed_rbac(db: AsyncSession) -> None:
+    await seed_roles(db)
     await seed_permissions(db)
     await seed_role_permissions(db)

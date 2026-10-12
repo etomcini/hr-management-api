@@ -50,3 +50,42 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t hr-management-api:ci .
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Create test environment file
+        run: |
+          cat > .env.test <<'EOF'
+          APP_ENV=testing
+          DATABASE_URL=postgresql+psycopg://test_user:test_password@test-db:5432/hr_test_db
+          JWT_SECRET_KEY=test-only-secret-key-not-for-production-123456789
+          MAIL_SERVER=localhost
+          MAIL_PORT=1025
+          MAIL_USERNAME=test_user
+          MAIL_PASSWORD=test_password
+          MAIL_FROM_EMAIL=test@example.com
+          FRONTEND_URL=http://localhost:3000
+          EOF
+
+      - name: Run pytest with PostgreSQL
+        run: |
+          docker compose -f compose.test.yaml up \
+            --build \
+            --abort-on-container-exit \
+            --exit-code-from tests
+
+      - name: Show test logs on failure
+        if: failure()
+        run: docker compose -f compose.test.yaml logs --no-color
+
+      - name: Clean up test containers
+        if: always()
+        run: docker compose -f compose.test.yaml down -v --remove-orphans

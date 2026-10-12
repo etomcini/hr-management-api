@@ -35,6 +35,13 @@ router = APIRouter(
     "/",
     response_model=list[EmployeeResponse],
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.EMPLOYEES_READ,
+            )
+        ),
+    ],
     summary="Get employees",
     description="Return all employees or filter employees by name.",
 )
@@ -51,6 +58,13 @@ async def get_employees(
     "/{employee_id}",
     response_model=EmployeeResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.EMPLOYEES_READ,
+            )
+        ),
+    ],
     summary="Get an employee by ID",
 )
 async def get_employee(
@@ -82,6 +96,13 @@ async def create_employee(
     "/{employee_id}",
     response_model=EmployeeResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.EMPLOYEES_UPDATE,
+            )
+        ),
+    ],
     summary="Partially update an employee",
 )
 async def update_employee(
