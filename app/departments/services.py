@@ -43,7 +43,7 @@ async def get_db_departments(
 
     result = await db.scalars(stmt)
 
-    return list(result(all))
+    return list(result.all())
 
 
 async def get_db_department_by_id(

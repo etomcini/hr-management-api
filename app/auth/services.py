@@ -124,6 +124,7 @@ async def refresh_access_token(
         RefreshToken.jti == jti,
         RefreshToken.user_id == user_id,
         RefreshToken.revoked_at.is_(None),
+        RefreshToken.expires_at > datetime.now(UTC),
     )
 
     refresh_session = await db.scalar(stmt)

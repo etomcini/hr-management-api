@@ -19,6 +19,11 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "factory-boy>=3.3.3",
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.16.10",
 ]
 
@@ -29,3 +34,22 @@ extend-exclude = [
 
 [tool.ruff.lint.per-file-ignores]
 "alembic/env.py" = ["INP001"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+addopts = [
+    "-ra",
+    "--strict-markers",
+]
+
+markers = [
+    "unit: Tests without external dependencies",
+    "integration: Database and service integration tests",
+    "api: FastAPI HTTP endpoint tests",
+]
