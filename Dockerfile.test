@@ -1,0 +1,27 @@
+# -------------------------
+# Test image
+# -------------------------
+FROM python:3.14-slim
+
+WORKDIR /app
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Copy dependency definitions
+COPY pyproject.toml uv.lock ./
+
+# Install runtime and development dependencies
+RUN uv sync \
+    --frozen \
+    --dev \
+    --no-install-project
+
+# Copy application, migrations and tests
+COPY . .
+
+# Make the virtual environment available
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Default test command
+CMD ["pytest", "-v"]
