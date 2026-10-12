@@ -13,7 +13,7 @@ COPY pyproject.toml uv.lock ./
 
 # Install runtime and development dependencies
 RUN uv sync \
-    --frozen \
+    --locked \
     --dev \
     --no-install-project
 
