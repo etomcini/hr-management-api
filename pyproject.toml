@@ -18,10 +18,12 @@ dependencies = [
 ]
 
 [tool.ruff]
-target-version = "py314"
+extend-exclude = [
+    "alembic/versions",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/env.py" = ["INP001"]
 
 [tool.ruff.lint]
 ignore = ["N999"]
-
-[tool.ruff.lint.per-file-ignores]
-"alembic/**/*.py" = ["INP001"]
