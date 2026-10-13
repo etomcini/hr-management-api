@@ -20,3 +20,21 @@ class PermissionName(StrEnum):
     ROLES_UPDATE = "roles:update"
     ROLES_DELETE = "roles:delete"
     ROLES_ASSIGN = "roles:assign"
+
+    # User-role assignment permissions
+    USER_ROLES_READ = "user_roles:read"
+    USER_ROLES_ASSIGN = "user_roles:assign"
+    USER_ROLES_UPDATE = "user_roles:update"
+    USER_ROLES_DELETE = "user_roles:delete"
+
+    # Job Positions assignment permissions
+    JOB_POSITIONS_READ = "job_positions:read"
+    JOB_POSITIONS_CREATE = "job_positions:create"
+    JOB_POSITIONS_UPDATE = "job_positions:update"
+    JOB_POSITIONS_DELETE = "job_positions:delete"
+
+    # Departments
+    DEPARTMENTS_READ = "departments:read"
+    DEPARTMENTS_CREATE = "departments:create"
+    DEPARTMENTS_UPDATE = "departments:update"
+    DEPARTMENTS_DELETE = "departments:delete"

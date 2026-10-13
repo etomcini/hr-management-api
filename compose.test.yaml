@@ -1,0 +1,47 @@
+name: hr-app-test
+
+services:
+  test-db:
+    image: postgres:18
+
+    environment:
+      POSTGRES_DB: hr_test_db
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+
+    tmpfs:
+      - /var/lib/postgresql
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U test_user -d hr_test_db",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+
+    env_file:
+      - .env.test
+
+    environment:
+      APP_ENV: testing
+      DATABASE_URL: postgresql+psycopg://test_user:test_password@test-db:5432/hr_test_db
+
+    depends_on:
+      test-db:
+        condition: service_healthy
+
+    command:
+      - sh
+      - -ec
+      - |
+        alembic upgrade head
+        python -m app.seeds.sync
+        pytest -v

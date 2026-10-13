@@ -3,7 +3,9 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.authorization import require_permissions
 from app.dependencies.database import get_db
+from app.permissions.enums import PermissionName
 
 if TYPE_CHECKING:
     from app.job_titles import models
@@ -31,6 +33,13 @@ router = APIRouter(
     "/",
     response_model=list[JobTitleResponse],
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.JOB_POSITIONS_READ,
+            )
+        ),
+    ],
     summary="Get all Job titles or only name filtered ones",
 )
 async def get_job_titles(
@@ -44,6 +53,13 @@ async def get_job_titles(
     "/{job_title_id}",
     response_model=JobTitleResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.JOB_POSITIONS_READ,
+            )
+        ),
+    ],
     summary="Get a Job title by ID",
 )
 async def get_job_title(
@@ -56,6 +72,13 @@ async def get_job_title(
     "/",
     response_model=JobTitleResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.JOB_POSITIONS_CREATE,
+            )
+        ),
+    ],
 )
 async def create_job_title(
     job_title_data: JobTitleCreate, db: Annotated[AsyncSession, Depends(get_db)]
@@ -67,6 +90,13 @@ async def create_job_title(
     "/{job_title_id}",
     response_model=JobTitleResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.JOB_POSITIONS_UPDATE,
+            )
+        ),
+    ],
     summary="Update Job title partialy through PATCH",
 )
 async def update_job_title(
@@ -80,6 +110,13 @@ async def update_job_title(
 @router.delete(
     "/{job_title_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[
+        Depends(
+            require_permissions(
+                PermissionName.JOB_POSITIONS_DELETE,
+            )
+        ),
+    ],
 )
 async def delete_job_title(
     job_title_id: int, db: Annotated[AsyncSession, Depends(get_db)]
