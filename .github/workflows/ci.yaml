@@ -4,12 +4,12 @@ on:
   pull_request:
     branches:
       - development
-      - production
+      - production-render
 
   push:
     branches:
       - development
-      - production
+      - production-render
 
 permissions:
   contents: read
