@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import HTTPException, Query, status
@@ -16,6 +17,10 @@ from app.users.admin_safety import (
     lock_admin_role,
 )
 from app.users.models import User, UserRole
+from app.users.password_change_rate_limit import (
+    check_password_change_rate_limit,
+    record_successful_password_change,
+)
 from app.users.role_policy import validate_role_changes
 
 if TYPE_CHECKING:
@@ -168,37 +173,69 @@ async def change_user_password(
     user: User,
     password_data: ChangePasswordRequest,
 ) -> None:
-    # Verify that the current password is correct.
+    # Lock the user row for this transaction 'with_for_update()'.
+    #
+    # This prevents concurrent password-change requests for the same
+    # user from both passing the rate-limit check before either
+    # request records its successful change.
+    stmt = select(User).where(User.id == user.id).with_for_update()
+
+    locked_user = await db.scalar(stmt)
+
+    if locked_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Verify the user's current password.
     if not verify_password(
         password_data.current_password,
-        user.password_hash,
+        locked_user.password_hash,
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",
         )
 
-    # Prevent the user from reusing their current password.
+    # Prevent reusing the existing password.
     if verify_password(
         password_data.new_password,
-        user.password_hash,
+        locked_user.password_hash,
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password must be different from current password",
         )
 
-    # Hash the new password before storing it in PostgreSQL.
-    user.password_hash = hash_password(password_data.new_password)
+    # Capture one timestamp for the rate-limit check and history entry.
+    now = datetime.now(UTC)
 
-    # Revoke every active session, including the current session.
-    # The user must log in again with the new password.
-    await revoke_all_sessions(
+    # Reject the request if four successful changes occurred
+    # within the preceding 60 minutes.
+    await check_password_change_rate_limit(
         db=db,
-        user_id=user.id,
+        user_id=locked_user.id,
+        now=now,
     )
 
-    # Commit the password update and session revocations together.
+    # Hash the new password.
+    locked_user.password_hash = hash_password(password_data.new_password)
+
+    # Revoke all active sessions, including the current session.
+    await revoke_all_sessions(
+        db=db,
+        user_id=locked_user.id,
+    )
+
+    # Record this successful change in the same transaction.
+    record_successful_password_change(
+        db=db,
+        user_id=locked_user.id,
+        now=now,
+    )
+
+    # Commit all changes atomically.
     await db.commit()
 
 
