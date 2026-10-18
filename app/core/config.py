@@ -47,5 +47,9 @@ class Settings(BaseSettings):
     frontend_url: str
     password_reset_token_expire_minutes: int = 30
 
+    # Password-change rate limiting
+    password_change_max_per_hour: int = 4
+    password_change_window_minutes: int = 60
+
 
 settings = Settings()  # Loaded from .env file

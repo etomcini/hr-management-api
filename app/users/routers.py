@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.authentication import CurrentSessionJTI, CurrentUser
+from app.auth.authentication import CurrentUser
 from app.auth.authorization import require_permissions
 from app.permissions.enums import PermissionName
 from app.users.models import User
@@ -106,12 +106,10 @@ async def change_password(
     password_data: ChangePasswordRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,
-    current_jti: CurrentSessionJTI,
 ) -> None:
     await change_user_password(
         db=db,
         user=current_user,
-        current_jti=current_jti,
         password_data=password_data,
     )
 
