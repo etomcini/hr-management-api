@@ -6,7 +6,7 @@ from fastapi import HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.services import revoke_other_sessions
+from app.auth.services import revoke_all_sessions
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
 from app.roles.models import Role
@@ -166,9 +166,9 @@ async def update_db_user(
 async def change_user_password(
     db: AsyncSession,
     user: User,
-    current_jti: str,
     password_data: ChangePasswordRequest,
 ) -> None:
+    # Verify that the current password is correct.
     if not verify_password(
         password_data.current_password,
         user.password_hash,
@@ -178,6 +178,7 @@ async def change_user_password(
             detail="Current password is incorrect",
         )
 
+    # Prevent the user from reusing their current password.
     if verify_password(
         password_data.new_password,
         user.password_hash,
@@ -187,14 +188,17 @@ async def change_user_password(
             detail="New password must be different from current password",
         )
 
+    # Hash the new password before storing it in PostgreSQL.
     user.password_hash = hash_password(password_data.new_password)
 
-    await revoke_other_sessions(
+    # Revoke every active session, including the current session.
+    # The user must log in again with the new password.
+    await revoke_all_sessions(
         db=db,
         user_id=user.id,
-        current_jti=current_jti,
     )
 
+    # Commit the password update and session revocations together.
     await db.commit()
 
 
