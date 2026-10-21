@@ -10,6 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.services import revoke_all_sessions
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
+from app.email.templates.password_changed_success_email import (
+    build_password_change_success_email,
+)
+from app.messaging.outbox import add_email_to_outbox
+from app.messaging.schemas import EmailJob
 from app.roles.models import Role
 from app.roles.services import get_role_by_name
 from app.users.admin_safety import (
@@ -233,6 +238,20 @@ async def change_user_password(
         db=db,
         user_id=locked_user.id,
         now=now,
+    )
+
+    email_content = build_password_change_success_email()
+
+    job = EmailJob(
+        recipient=user.email,
+        subject=email_content.subject,
+        text_content=email_content.text_content,
+        html_content=email_content.html_content,
+    )
+
+    add_email_to_outbox(
+        db=db,
+        job=job,
     )
 
     # Commit all changes atomically.

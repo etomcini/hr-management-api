@@ -9,7 +9,7 @@ class EmployeeFactory(factory.Factory):
     class Meta:
         model = Employee
 
-    employee_number = factory.Sequence(lambda n: f"EMP{n:06d}")
+    employee_number = factory.Sequence(lambda n: f"EMP-{n:04d}")
 
     first_name = factory.Sequence(lambda n: f"EmployeeFirst{n}")
 
