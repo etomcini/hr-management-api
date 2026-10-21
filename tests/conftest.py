@@ -12,10 +12,12 @@ from sqlalchemy.ext.asyncio import (
 
 from app.core.config import Environment, settings
 from app.dependencies.database import engine, get_db
+from app.employees.models import Employee
 from app.main import app
 from app.roles.enums import RoleName
 from app.roles.models import Role
 from app.users.models import User, UserRole
+from tests.factories.employees import EmployeeFactory
 from tests.factories.users import UserFactory
 
 
@@ -153,3 +155,15 @@ def login_as(client: AsyncClient):
         }
 
     return login
+
+
+@pytest.fixture
+async def test_employee(
+    db_session: AsyncSession,
+) -> Employee:
+    employee = EmployeeFactory.build()
+
+    db_session.add(employee)
+    await db_session.flush()
+
+    return employee

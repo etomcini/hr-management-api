@@ -12,6 +12,7 @@ A modular, asynchronous **Human Resources Management REST API** built with **Fas
 - [Architecture and project structure](#architecture-and-project-structure)
 - [Database and migrations](#database-and-migrations)
 - [Authentication and authorization](#authentication-and-authorization)
+- [Asynchronous email notifications](#asynchronous-email-notifications)
 - [Getting started](#getting-started)
 - [API documentation and live demo](#api-documentation-and-live-demo)
 - [Running tests](#running-tests)
@@ -49,7 +50,14 @@ The API currently uses the `/api/v1` prefix to support future API versions witho
 - Logout of the current session and logout from all sessions.
 - Revoked or expired refresh sessions invalidate the associated access session.
 - Forgot-password and reset-password flows with email integration.
-- Session revocation when credentials are reset.
+- Session revocation when credentials are reset or changed.
+- Password-change limit of four successful changes per rolling hour.
+
+### Employee notifications
+
+- Welcome emails when an employee is created with a linked user or assigned a different user account.
+- No duplicate welcome email for repeated assignment of the same user.
+- Employee updates use PostgreSQL row locking (`SELECT ... FOR UPDATE`) to serialize concurrent requests.
 
 ### Role-based access control (RBAC)
 
@@ -59,7 +67,7 @@ The API currently uses the `/api/v1` prefix to support future API versions witho
 - Idempotent role and permission synchronization.
 - HR Operator restrictions on privileged role assignments and self-role changes.
 - Safeguards that prevent deletion, deactivation, or role removal from leaving the system without an active Admin.
-- PostgreSQL row locking used in Admin-sensitive operations.
+- PostgreSQL row locking used in Admin-sensitive operations and employee updates to serialize concurrent changes.
 
 ## Technology stack
 
@@ -77,6 +85,8 @@ The API currently uses the `/api/v1` prefix to support future API versions witho
 | Containers | Docker, Docker Compose | Repeatable development and testing environments |
 | Testing | pytest, pytest-asyncio, HTTPX | Unit, integration, and API tests |
 | Test data | Factory Boy | Reusable test factories |
+| Messaging | RabbitMQ | Asynchronous email delivery, retry queues, and dead-letter handling |
+| Email reliability | Transactional outbox, delivery ledger | Reliable publishing and duplicate-delivery protection |
 | Code quality | Ruff | Linting and formatting |
 | CI | GitHub Actions | Automated quality, Docker build, and test checks |
 
@@ -114,6 +124,8 @@ The following is a **representative structure** of the modules and files discuss
 │   ├── permissions/
 │   │   └── enums.py
 │   ├── employees/
+│   ├── email/                      # Email templates and notification content
+│   ├── messaging/                  # RabbitMQ, outbox, workers, delivery tracking
 │   ├── departments/
 │   ├── job_titles/
 │   ├── job_positions/
@@ -151,6 +163,7 @@ The following is a **representative structure** of the modules and files discuss
 - **Authentication** resolves the current user and validates active sessions.
 - **Authorization** enforces permissions and role-specific restrictions.
 - **Seeds** synchronize predefined roles and permissions independently of application startup.
+- **Messaging workers** publish outbox jobs and process email delivery independently of API requests.
 
 ## Database and migrations
 
@@ -197,6 +210,17 @@ Permissions are assigned to roles; users receive permissions through their assig
 **Important security rules:** HR Operators cannot assign, remove, or replace privileged Admin/HR Manager roles and cannot modify their own roles. Admin-sensitive operations protect against removing the final active Admin.
 
 Role names describe the predefined role types; exact permissions are defined in `app/seeds/permissions.py` and should be treated as the source of truth.
+
+## Asynchronous email notifications
+
+Email notifications are processed asynchronously through **RabbitMQ**, keeping SMTP delivery outside API request handling. Supported notifications include password-reset requests, successful password resets and changes, and employee welcome emails.
+
+- **Transactional outbox:** business changes and email jobs are stored together in PostgreSQL; a separate publisher sends pending jobs to RabbitMQ with publisher confirms and retry tracking.
+- **Background email worker:** consumes queued jobs, sends email through SMTP, and handles temporary failures with delayed retries and dead-letter handling.
+- **Delivery ledger:** records delivery claims and results to reduce duplicate sends and support recovery after worker interruptions.
+- **Expiration:** time-sensitive messages, such as password-reset emails, are skipped after their validity period.
+
+Email delivery is **asynchronous**: a successful API response does not guarantee that SMTP delivery has already completed. Worker retries and deduplication reduce delivery failures but cannot guarantee exactly-once SMTP delivery.
 
 ## Getting started
 
@@ -410,17 +434,17 @@ The testing environment is designed to:
 
 The cleanup command removes the **test** containers and volumes. It should not be used against a persistent database environment.
 
-### 3. Test Results
+### Test results
 
-The test suite covers authentication, authorization, user management, role permissions, session management, and other application functionality.
+The test suite covers authentication, authorization, user management, role permissions, session management, employee notifications, and asynchronous messaging.
 
-A successful test execution returns a summary similar to:
+Latest supplied test run (21 October 2026):
 
 ```text
-================== 181 passed in 27.70s ==================
+============================= 245 passed in 32.55s =============================
 ```
 
-The number of tests and execution time may change as the project evolves.
+The test count and execution time will change as the project evolves.
 
 ### Test coverage areas
 
@@ -431,6 +455,12 @@ The number of tests and execution time may change as the project evolves.
 - HR Operator permission restrictions and self-role protections.
 - Last-active-Admin safeguards.
 - RBAC seed correctness and idempotency.
+- Password-change rate limiting (four successful changes per rolling hour) and session invalidation.
+- Employee welcome-email creation, reassignment, and suppression of duplicate notifications.
+- PostgreSQL employee row locking and concurrent identical user assignments.
+- Transactional rollback when employee notification outbox creation fails, including a real PostgreSQL outbox constraint failure.
+- RabbitMQ email-worker retries, busy-message deferral, expiration, and dead-letter behavior.
+- Outbox retry scheduling, delivery-ledger claims, deduplication, and worker crash recovery.
 - Basic unit/configuration checks.
 
 > **Concurrency note:** Sequential Admin-safety tests are implemented; a dedicated multi-connection concurrency test for simultaneous Admin changes remains a recommended follow-up.

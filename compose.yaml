@@ -113,5 +113,74 @@ services:
       retries: 5
       start_period: 10s
 
+  rabbitmq:
+    image: rabbitmq:4-management
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?RABBITMQ_USER is required}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-hr_app}
+
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+    networks:
+      - default
+
+  email-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    command: ["python", "-m", "app.messaging.worker"]
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      APP_ENV: development
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  outbox-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    command: python -m app.messaging.outbox_worker
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      RABBITMQ_HOST: rabbitmq
+
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
 volumes:
   postgres_data:
+  rabbitmq_data:

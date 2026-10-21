@@ -65,6 +65,9 @@ jobs:
         run: |
           cat > .env.test <<'EOF'
           APP_ENV=testing
+          RABBITMQ_USER=hr_app
+          RABBITMQ_PASSWORD=rabbitmqP@ssw0rd
+          RABBITMQ_VHOST=hr_app
           DATABASE_URL=postgresql+psycopg://test_user:test_password@test-db:5432/hr_test_db
           JWT_SECRET_KEY=test-only-secret-key-not-for-production-123456789
           MAIL_SERVER=localhost

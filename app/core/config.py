@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     mail_from_name: str = "HR App"
     mail_start_tls: bool = True
 
+    # RabbitMQ
+    rabbitmq_user: str
+    rabbitmq_password: SecretStr
+    rabbitmq_vhost: str = "hr_app"
+    rabbitmq_host: str = "rabbitmq"
+    rabbitmq_port: int = 5672
+
     # Password reset
     frontend_url: str
     password_reset_token_expire_minutes: int = 30

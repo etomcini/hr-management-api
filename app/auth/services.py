@@ -15,7 +15,6 @@ from app.auth.password_reset import (
 from app.auth.schemas import AccessTokenResponse, Token
 from app.core.config import settings
 from app.core.datetime import ensure_utc
-from app.core.email import send_password_reset_email
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -23,6 +22,12 @@ from app.core.security import (
     verify_password,
     verify_token,
 )
+from app.email.templates.password_reset_request_email import build_password_reset_email
+from app.email.templates.password_reset_success_email import (
+    build_password_reset_success_email,
+)
+from app.messaging.outbox import add_email_to_outbox
+from app.messaging.schemas import EmailJob
 from app.users.models import User
 
 # from app.users.services import get_user_by_email
@@ -230,30 +235,35 @@ async def forgot_password(
 
     user = await db.scalar(stmt)
 
-    # Always behave the same way when the account does not exist.
-    # This prevents exposing which email addresses are registered.
-    if user is None:
-        return
-
     # Do not send password-reset emails for inactive accounts.
     # The API response will still be identical.
-    if not user.is_active:
+    if user is None or not user.is_active:
         return
 
-    reset_token = await create_password_reset_token(
+    created_token = await create_password_reset_token(
         db=db,
         user_id=user.id,
     )
 
-    try:
-        await send_password_reset_email(
-            to_email=user.email,
-            reset_token=reset_token,
-        )
-    except Exception:
-        await db.rollback()
-        raise
+    email_content = build_password_reset_email(
+        reset_token=created_token.token,
+    )
 
+    job = EmailJob(
+        recipient=user.email,
+        subject=email_content.subject,
+        text_content=email_content.text_content,
+        html_content=email_content.html_content,
+        expires_at=created_token.expires_at,
+    )
+
+    # Add the pending email to the same database transaction.
+    add_email_to_outbox(
+        db=db,
+        job=job,
+    )
+
+    # Ensure the token exists before the worker can send it.
     await db.commit()
 
 
@@ -341,6 +351,20 @@ async def reset_password(
     await revoke_all_sessions(
         db=db,
         user_id=user.id,
+    )
+
+    email_content = build_password_reset_success_email()
+
+    job = EmailJob(
+        recipient=user.email,
+        subject=email_content.subject,
+        text_content=email_content.text_content,
+        html_content=email_content.html_content,
+    )
+
+    add_email_to_outbox(
+        db=db,
+        job=job,
     )
 
     await db.commit()

@@ -8,8 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.departments.models import Department
+from app.email.templates.employee_onboarding_welcome import build_employee_welcome_email
 from app.employees.models import Employee, EmployeeNumberCounter
 from app.job_titles.models import JobTitle
+from app.messaging.outbox import add_email_to_outbox
+from app.messaging.schemas import EmailJob
 from app.users.models import User
 
 if TYPE_CHECKING:
@@ -46,9 +49,9 @@ async def _validate_user(
     user_id: int | None,
     *,
     employee_id: int | None = None,
-) -> None:
+) -> User | None:
     if user_id is None:
-        return
+        return None
 
     user = await db.get(User, user_id)
 
@@ -70,6 +73,8 @@ async def _validate_user(
             status_code=status.HTTP_409_CONFLICT,
             detail="User is already assigned to another employee",
         )
+
+    return user
 
 
 async def _validate_department(
@@ -143,6 +148,28 @@ async def _validate_manager(
         )
 
 
+async def _get_employee_for_update(
+    db: AsyncSession,
+    employee_id: int,
+) -> Employee:
+    stmt = (
+        select(Employee)
+        .where(Employee.id == employee_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+    employee = await db.scalar(stmt)
+
+    if employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found",
+        )
+
+    return employee
+
+
 # -------------------------
 # Public service functions
 # -------------------------
@@ -205,7 +232,7 @@ async def create_db_employee(
     db: AsyncSession,
     employee_data: EmployeeCreate,
 ) -> Employee:
-    await _validate_user(
+    user = await _validate_user(
         db,
         employee_data.user_id,
     )
@@ -233,6 +260,22 @@ async def create_db_employee(
     )
 
     db.add(employee)
+
+    if user is not None:
+        email_content = build_employee_welcome_email()
+
+        job = EmailJob(
+            recipient=user.email,
+            subject=email_content.subject,
+            text_content=email_content.text_content,
+            html_content=email_content.html_content,
+        )
+
+        add_email_to_outbox(
+            db=db,
+            job=job,
+        )
+
     await db.commit()
     await db.refresh(employee)
 
@@ -244,12 +287,21 @@ async def update_db_employee(
     employee_id: int,
     employee_data: EmployeeUpdate,
 ) -> Employee:
-    employee = await get_db_employee_by_id(db, employee_id)
+    employee = await _get_employee_for_update(db, employee_id)
 
     update_data = employee_data.model_dump(exclude_unset=True)
 
+    # Determine whether a new user is being assigned.
+    user_id_changed = (
+        "user_id" in update_data
+        and update_data["user_id"] is not None
+        and update_data["user_id"] != employee.user_id
+    )
+
+    user: User | None = None
+
     if "user_id" in update_data:
-        await _validate_user(
+        user = await _validate_user(
             db,
             update_data["user_id"],
             employee_id=employee.id,
@@ -274,8 +326,26 @@ async def update_db_employee(
             employee_id=employee.id,
         )
 
+    # Apply validated updates.
     for field, value in update_data.items():
         setattr(employee, field, value)
+
+    # Send welcome email only when user_id changes
+    # to a valid, non-null user.
+    if user_id_changed and user is not None:
+        email_content = build_employee_welcome_email()
+
+        job = EmailJob(
+            recipient=user.email,
+            subject=email_content.subject,
+            text_content=email_content.text_content,
+            html_content=email_content.html_content,
+        )
+
+        add_email_to_outbox(
+            db=db,
+            job=job,
+        )
 
     await db.commit()
     await db.refresh(employee)

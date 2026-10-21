@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import update
@@ -7,6 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import PasswordResetToken
 from app.core.config import settings
+
+
+@dataclass(frozen=True)
+class CreatedPasswordResetToken:
+    token: str
+    expires_at: datetime
 
 
 def generate_password_reset_token() -> tuple[str, str]:
@@ -43,7 +50,7 @@ async def invalidate_password_reset_tokens(
 async def create_password_reset_token(
     db: AsyncSession,
     user_id: int,
-) -> str:
+) -> CreatedPasswordResetToken:
     await invalidate_password_reset_tokens(
         db=db,
         user_id=user_id,
@@ -51,19 +58,24 @@ async def create_password_reset_token(
 
     token, token_hash = generate_password_reset_token()
 
+    # Calculate the expiration once.
+    expires_at = datetime.now(UTC) + timedelta(
+        minutes=settings.password_reset_token_expire_minutes,
+    )
+
     reset_token = PasswordResetToken(
         user_id=user_id,
         token_hash=token_hash,
-        expires_at=(
-            datetime.now(UTC)
-            + timedelta(
-                minutes=settings.password_reset_token_expire_minutes,
-            )
-        ),
+        expires_at=expires_at,
     )
 
     db.add(reset_token)
 
+    # Write changes within the current transaction,
+    # without committing.
     await db.flush()
 
-    return token
+    return CreatedPasswordResetToken(
+        token=token,
+        expires_at=expires_at,
+    )
